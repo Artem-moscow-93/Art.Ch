@@ -18,190 +18,36 @@ button{cursor:pointer;font-weight:600}.primary{background:var(--accent);color:#f
 .grid{display:grid;grid-template-columns:1.65fr 1fr;gap:14px}.panel{padding:18px}.panel h2{font-size:16px;margin:0 0 16px}.wide{grid-column:1/-1}
 .chartWrap{position:relative;height:300px;min-height:300px;max-height:300px;overflow:hidden}.chartWrap canvas{width:100%!important;height:100%!important}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--muted)}.money{text-align:right}.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--soft);font-size:12px}
-.status{margin-top:14px;color:var(--muted);font-size:12px}.notice{background:#fff8e8;border:1px solid #f0dfb7;color:#6d5422;padding:12px 14px;border-radius:14px;margin-bottom:14px;font-size:13px}
-.hidden{display:none}
+.status{margin-top:14px;color:var(--muted);font-size:12px}.notice{background:#fff8e8;border:1px solid #f0dfb7;color:#6d5422;padding:12px 14px;border-radius:14px;margin-bottom:14px;font-size:13px}.hidden{display:none}
 @media(max-width:860px){.top{display:block}.filters{margin-top:14px}.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.chartWrap{height:260px;min-height:260px;max-height:260px}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="notice hidden" id="configNotice"></div>
-
-  <div class="top">
-    <div>
-      <h1>Семейные финансы</h1>
-      <div class="sub" id="periodText">Источник: Google Sheets · API_дашборд</div>
-    </div>
-    <div class="filters">
-      <button id="authBtn" class="primary">Войти через Google</button>
-      <select id="yearFilter"></select>
-      <select id="monthFilter">
-        <option value="all">Весь год</option>
-        <option value="01">Январь</option><option value="02">Февраль</option><option value="03">Март</option>
-        <option value="04">Апрель</option><option value="05">Май</option><option value="06">Июнь</option>
-        <option value="07">Июль</option><option value="08">Август</option><option value="09">Сентябрь</option>
-        <option value="10">Октябрь</option><option value="11">Ноябрь</option><option value="12">Декабрь</option>
-      </select>
-      <select id="ownerFilter">
-        <option value="all">Вся семья</option><option value="Артем">Артем</option><option value="Тамара">Тамара</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="cards">
-    <div class="card"><div class="label">Расходы</div><div class="value" id="expenses">—</div><div class="delta">за выбранный период</div></div>
-    <div class="card"><div class="label">Доходы</div><div class="value" id="income">—</div><div class="delta">за выбранный период</div></div>
-    <div class="card"><div class="label">Чистый поток</div><div class="value" id="net">—</div><div class="delta">доходы − расходы</div></div>
-    <div class="card"><div class="label">Без крупных проектов</div><div class="value" id="core">—</div><div class="delta">повседневные и обязательные</div></div>
-  </div>
-
-  <div class="grid">
-    <div class="panel"><h2>Расходы и доходы по месяцам</h2><div class="chartWrap"><canvas id="monthlyChart"></canvas></div></div>
-    <div class="panel"><h2>Структура расходов</h2><div class="chartWrap"><canvas id="categoryChart"></canvas></div></div>
-    <div class="panel wide"><h2>Крупнейшие категории</h2>
-      <table><thead><tr><th>Категория</th><th>Тип</th><th class="money">Расходы</th><th class="money">Доля</th></tr></thead>
-      <tbody id="categoryTable"></tbody></table>
-    </div>
-  </div>
-  <div class="status" id="statusText">Ожидается подключение к Google Sheets</div>
-</div>
-
+<div class="notice hidden" id="configNotice"></div>
+<div class="top"><div><h1>Семейные финансы</h1><div class="sub" id="periodText">Источник: Google Sheets · API_дашборд</div></div>
+<div class="filters"><button id="authBtn" class="primary">Войти через Google</button><select id="yearFilter"></select><select id="monthFilter"><option value="all">Весь год</option><option value="01">Январь</option><option value="02">Февраль</option><option value="03">Март</option><option value="04">Апрель</option><option value="05">Май</option><option value="06">Июнь</option><option value="07">Июль</option><option value="08">Август</option><option value="09">Сентябрь</option><option value="10">Октябрь</option><option value="11">Ноябрь</option><option value="12">Декабрь</option></select><select id="ownerFilter"><option value="all">Вся семья</option><option value="Артем">Артем</option><option value="Тамара">Тамара</option></select></div></div>
+<div class="cards"><div class="card"><div class="label">Расходы</div><div class="value" id="expenses">—</div><div class="delta">за выбранный период</div></div><div class="card"><div class="label">Доходы</div><div class="value" id="income">—</div><div class="delta">за выбранный период</div></div><div class="card"><div class="label">Чистый поток</div><div class="value" id="net">—</div><div class="delta">сумма со знаком</div></div><div class="card"><div class="label">Без крупных проектов</div><div class="value" id="core">—</div><div class="delta">повседневные и обязательные</div></div></div>
+<div class="grid"><div class="panel"><h2>Расходы и доходы по месяцам</h2><div class="chartWrap"><canvas id="monthlyChart"></canvas></div></div><div class="panel"><h2>Структура расходов</h2><div class="chartWrap"><canvas id="categoryChart"></canvas></div></div><div class="panel wide"><h2>Крупнейшие категории</h2><table><thead><tr><th>Категория</th><th>Тип</th><th class="money">Расходы</th><th class="money">Доля</th></tr></thead><tbody id="categoryTable"></tbody></table></div></div>
+<div class="status" id="statusText">Ожидается подключение к Google Sheets</div></div>
 <script>
-const CONFIG = {
-  CLIENT_ID: "281194888037-hi3ftrf91fojavivh2rq0hvntlvqugb5.apps.googleusercontent.com",
-  SPREADSHEET_ID: "1XnqDNVnb7S9GiqzW8WZ1DgoC0vGbmO3XED5QLTgOiIc",
-  RANGE: "API_дашборд!A:P",
-  SCOPES: "https://www.googleapis.com/auth/spreadsheets.readonly"
-};
-
-let tokenClient = null;
-let accessToken = null;
-let operations = [];
-let monthlyChart = null;
-let categoryChart = null;
-
-const rub = n => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(Number(n)||0)+' ₽';
-const parseNum = v => typeof v === 'number' ? v : (Number(String(v ?? "0").replace(/[^0-9,.-]/g,"").replace(",", ".")) || 0);
-
-function initAuth(){
-  if (!window.google?.accounts?.oauth2) return setTimeout(initAuth, 200);
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CONFIG.CLIENT_ID,
-    scope: CONFIG.SCOPES,
-    callback: async resp => {
-      if (resp.error) { setStatus("Ошибка OAuth: "+resp.error); return; }
-      accessToken = resp.access_token;
-      document.getElementById("authBtn").textContent = "Обновить данные";
-      await loadSheet();
-    }
-  });
-}
-initAuth();
-
-document.getElementById("authBtn").onclick = () => {
-  if (!tokenClient) return setStatus("Google Identity Services ещё загружается");
-  tokenClient.requestAccessToken({prompt: accessToken ? "" : "consent"});
-};
-
-async function loadSheet(){
-  try {
-    setStatus("Загружаю API_дашборд…");
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${encodeURIComponent(CONFIG.RANGE)}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`;
-    const r = await fetch(url,{headers:{Authorization:`Bearer ${accessToken}`}});
-    if (!r.ok) {
-      const t = await r.text();
-      setStatus(`Ошибка Sheets API ${r.status}: ${t.slice(0,220)}`);
-      return;
-    }
-    const data = await r.json();
-    const rows = data.values || [];
-    if (rows.length < 2) return setStatus("API_дашборд пуст");
-    const h = rows[0];
-    operations = rows.slice(1).map(row => Object.fromEntries(h.map((k,i)=>[k,row[i] ?? ""])));
-    populateYears();
-    render();
-    setStatus(`Загружено операций: ${operations.length.toLocaleString('ru-RU')} · источник обновлён`);
-  } catch (e) {
-    console.error(e);
-    setStatus("Ошибка загрузки данных: "+e.message);
-  }
-}
-
-function populateYears(){
-  const years = [...new Set(operations.map(x=>String(x["Год"])).filter(Boolean))].sort((a,b)=>Number(b)-Number(a));
-  const s = document.getElementById("yearFilter");
-  const current = s.value && years.includes(s.value) ? s.value : years[0];
-  s.innerHTML = years.map(y=>`<option ${y===current?'selected':''}>${y}</option>`).join("");
-}
-
-function filtered(){
-  const y=document.getElementById("yearFilter").value;
-  const m=document.getElementById("monthFilter").value;
-  const o=document.getElementById("ownerFilter").value;
-  return operations.filter(x =>
-    String(x["Год"])===y &&
-    (m==="all" || String(x["Месяц"]).endsWith("-"+m)) &&
-    (o==="all" || x["Владелец"]===o)
-  );
-}
-
-function render(){
-  const rows=filtered();
-  const expRows=rows.filter(x=>x["Направление"]==="Расход");
-  const incRows=rows.filter(x=>x["Направление"]==="Доход");
-  const exp=expRows.reduce((a,x)=>a+parseNum(x["Сумма, ₽"]),0);
-  const inc=incRows.reduce((a,x)=>a+parseNum(x["Сумма, ₽"]),0);
-  const core=expRows.filter(x=>x["Группа бюджета"]!=="Крупные проекты").reduce((a,x)=>a+parseNum(x["Сумма, ₽"]),0);
-
-  document.getElementById('expenses').textContent=rub(exp);
-  document.getElementById('income').textContent=rub(inc);
-  document.getElementById('net').textContent=rub(inc-exp);
-  document.getElementById('core').textContent=rub(core);
-
-  const monthKeys = Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0"));
-  const monthMap = Object.fromEntries(monthKeys.map(k=>[k,{e:0,i:0}]));
-  rows.forEach(x=>{
-    const mm=String(x["Месяц"]).slice(-2);
-    if(!monthMap[mm]) return;
-    if(x["Направление"]==="Расход") monthMap[mm].e+=parseNum(x["Сумма, ₽"]);
-    if(x["Направление"]==="Доход") monthMap[mm].i+=parseNum(x["Сумма, ₽"]);
-  });
-  const labels=["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"];
-  monthlyChart?.destroy();
-  monthlyChart=new Chart(document.getElementById("monthlyChart"),{
-    type:"bar",data:{labels,datasets:[
-      {label:"Расходы",data:monthKeys.map(k=>monthMap[k].e),borderRadius:5},
-      {label:"Доходы",data:monthKeys.map(k=>monthMap[k].i),borderRadius:5}
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,resizeDelay:150,plugins:{legend:{position:"bottom"}}}
-  });
-
-  const cats={};
-  expRows.forEach(x=>{
-    const k=x["Категория"]||"Без категории";
-    cats[k]=(cats[k]||0)+parseNum(x["Сумма, ₽"]);
-  });
-  const sorted=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
-  const top=sorted.slice(0,8);
-  categoryChart?.destroy();
-  categoryChart=new Chart(document.getElementById("categoryChart"),{
-    type:"doughnut",data:{labels:top.map(x=>x[0]),datasets:[{data:top.map(x=>x[1]),borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,resizeDelay:150,cutout:"67%",plugins:{legend:{position:"bottom"}}}
-  });
-
-  const groupByCategory={};
-  expRows.forEach(x=>{ if(!groupByCategory[x["Категория"]]) groupByCategory[x["Категория"]]=x["Группа бюджета"]||""; });
-  const tbody=document.getElementById('categoryTable');
-  tbody.innerHTML="";
-  sorted.slice(0,15).forEach(([name,sum])=>{
-    const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${name}</td><td><span class="badge">${groupByCategory[name]||"—"}</span></td><td class="money">${rub(sum)}</td><td class="money">${exp? (sum/exp*100).toFixed(1):"0.0"}%</td>`;
-    tbody.appendChild(tr);
-  });
-}
-
-function setStatus(t){document.getElementById("statusText").textContent=t}
-["yearFilter","monthFilter","ownerFilter"].forEach(id=>document.getElementById(id).addEventListener("change",()=>operations.length&&render()));
+const CONFIG={CLIENT_ID:"281194888037-hi3ftrf91fojavivh2rq0hvntlvqugb5.apps.googleusercontent.com",SPREADSHEET_ID:"1XnqDNVnb7S9GiqzW8WZ1DgoC0vGbmO3XED5QLTgOiIc",RANGE:"API_дашборд!A:P",SCOPES:"https://www.googleapis.com/auth/spreadsheets.readonly"};
+let tokenClient=null,accessToken=null,operations=[],monthlyChart=null,categoryChart=null;
+const rub=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(Number(n)||0)+' ₽';
+const parseNum=v=>typeof v==='number'?v:(Number(String(v??"0").replace(/[^0-9,.-]/g,"").replace(",","."))||0);
+function initAuth(){if(!window.google?.accounts?.oauth2)return setTimeout(initAuth,200);tokenClient=google.accounts.oauth2.initTokenClient({client_id:CONFIG.CLIENT_ID,scope:CONFIG.SCOPES,callback:async resp=>{if(resp.error){setStatus("Ошибка OAuth: "+resp.error);return;}accessToken=resp.access_token;document.getElementById("authBtn").textContent="Обновить данные";await loadSheet();}})}initAuth();
+document.getElementById("authBtn").onclick=()=>{if(!tokenClient)return setStatus("Google Identity Services ещё загружается");tokenClient.requestAccessToken({prompt:accessToken?"":"consent"});};
+async function loadSheet(){try{setStatus("Загружаю API_дашборд…");const url=`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${encodeURIComponent(CONFIG.RANGE)}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`;const r=await fetch(url,{headers:{Authorization:`Bearer ${accessToken}`}});if(!r.ok){const t=await r.text();setStatus(`Ошибка Sheets API ${r.status}: ${t.slice(0,220)}`);return;}const data=await r.json(),rows=data.values||[];if(rows.length<2)return setStatus("API_дашборд пуст");const h=rows[0];operations=rows.slice(1).map(row=>Object.fromEntries(h.map((k,i)=>[k,row[i]??""])));populateYears();render();setStatus(`Загружено операций: ${operations.length.toLocaleString('ru-RU')} · источник обновлён`);}catch(e){console.error(e);setStatus("Ошибка загрузки данных: "+e.message)}}
+function populateYears(){const years=[...new Set(operations.map(x=>String(x["Год"])).filter(Boolean))].sort((a,b)=>Number(b)-Number(a));const s=document.getElementById("yearFilter"),current=s.value&&years.includes(s.value)?s.value:years[0];s.innerHTML=years.map(y=>`<option ${y===current?'selected':''}>${y}</option>`).join("")}
+function filtered(){const y=document.getElementById("yearFilter").value,m=document.getElementById("monthFilter").value,o=document.getElementById("ownerFilter").value;return operations.filter(x=>String(x["Год"])===y&&(m==="all"||String(x["Месяц"]).endsWith("-"+m))&&(o==="all"||x["Владелец"]===o))}
+function render(){const rows=filtered();const expenseRows=rows.filter(x=>x["Направление"]==="Расход"||x["Направление"]==="Возврат");const incomeRows=rows.filter(x=>x["Направление"]==="Доход");
+const exp=expenseRows.reduce((a,x)=>a-parseNum(x["Сумма со знаком, ₽"]),0);const inc=incomeRows.reduce((a,x)=>a+parseNum(x["Сумма со знаком, ₽"]),0);const netValue=rows.reduce((a,x)=>a+parseNum(x["Сумма со знаком, ₽"]),0);const core=expenseRows.filter(x=>x["Группа бюджета"]!=="Крупные проекты").reduce((a,x)=>a-parseNum(x["Сумма со знаком, ₽"]),0);
+document.getElementById('expenses').textContent=rub(exp);document.getElementById('income').textContent=rub(inc);document.getElementById('net').textContent=rub(netValue);document.getElementById('core').textContent=rub(core);
+const monthKeys=Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0"));const monthMap=Object.fromEntries(monthKeys.map(k=>[k,{e:0,i:0}]));rows.forEach(x=>{const mm=String(x["Месяц"]).slice(-2),dir=x["Направление"],signed=parseNum(x["Сумма со знаком, ₽"]);if(!monthMap[mm])return;if(dir==="Расход"||dir==="Возврат")monthMap[mm].e-=signed;if(dir==="Доход")monthMap[mm].i+=signed;});
+const labels=["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"];monthlyChart?.destroy();monthlyChart=new Chart(document.getElementById("monthlyChart"),{type:"bar",data:{labels,datasets:[{label:"Расходы",data:monthKeys.map(k=>monthMap[k].e),borderRadius:5},{label:"Доходы",data:monthKeys.map(k=>monthMap[k].i),borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,resizeDelay:150,plugins:{legend:{position:"bottom"}}}});
+const cats={};expenseRows.forEach(x=>{const k=x["Категория"]||"Без категории";cats[k]=(cats[k]||0)-parseNum(x["Сумма со знаком, ₽"])});const sorted=Object.entries(cats).filter(([,sum])=>Math.abs(sum)>0.005).sort((a,b)=>b[1]-a[1]),top=sorted.filter(([,sum])=>sum>0).slice(0,8);categoryChart?.destroy();categoryChart=new Chart(document.getElementById("categoryChart"),{type:"doughnut",data:{labels:top.map(x=>x[0]),datasets:[{data:top.map(x=>x[1]),borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,resizeDelay:150,cutout:"67%",plugins:{legend:{position:"bottom"}}}});
+const groupByCategory={};expenseRows.forEach(x=>{if(!groupByCategory[x["Категория"]])groupByCategory[x["Категория"]]=x["Группа бюджета"]||""});const tbody=document.getElementById('categoryTable');tbody.innerHTML="";sorted.filter(([,sum])=>sum>0).slice(0,15).forEach(([name,sum])=>{const tr=document.createElement("tr");tr.innerHTML=`<td>${name}</td><td><span class="badge">${groupByCategory[name]||"—"}</span></td><td class="money">${rub(sum)}</td><td class="money">${exp?(sum/exp*100).toFixed(1):"0.0"}%</td>`;tbody.appendChild(tr)});}
+function setStatus(t){document.getElementById("statusText").textContent=t}["yearFilter","monthFilter","ownerFilter"].forEach(id=>document.getElementById(id).addEventListener("change",()=>operations.length&&render()));
 </script>
 </body>
 </html>
