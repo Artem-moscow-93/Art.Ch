@@ -15,11 +15,12 @@ select,button{border:1px solid var(--line);background:#fff;padding:10px 12px;bor
 button{cursor:pointer;font-weight:600}.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}.card,.panel{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 26px rgba(31,55,39,.07)}
 .card{padding:18px}.label{font-size:13px;color:var(--muted);margin-bottom:8px}.value{font-size:25px;font-weight:700}.delta{font-size:12px;color:var(--muted);margin-top:7px}
-.grid{display:grid;grid-template-columns:1.65fr 1fr;gap:14px}.panel{padding:18px;min-height:330px}.panel h2{font-size:16px;margin:0 0 16px}.wide{grid-column:1/-1}
+.grid{display:grid;grid-template-columns:1.65fr 1fr;gap:14px}.panel{padding:18px}.panel h2{font-size:16px;margin:0 0 16px}.wide{grid-column:1/-1}
+.chartWrap{position:relative;height:300px;min-height:300px;max-height:300px;overflow:hidden}.chartWrap canvas{width:100%!important;height:100%!important}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--muted)}.money{text-align:right}.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--soft);font-size:12px}
 .status{margin-top:14px;color:var(--muted);font-size:12px}.notice{background:#fff8e8;border:1px solid #f0dfb7;color:#6d5422;padding:12px 14px;border-radius:14px;margin-bottom:14px;font-size:13px}
 .hidden{display:none}
-@media(max-width:860px){.top{display:block}.filters{margin-top:14px}.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
+@media(max-width:860px){.top{display:block}.filters{margin-top:14px}.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.chartWrap{height:260px;min-height:260px;max-height:260px}}
 </style>
 </head>
 <body>
@@ -55,8 +56,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 8px;
   </div>
 
   <div class="grid">
-    <div class="panel"><h2>Расходы и доходы по месяцам</h2><canvas id="monthlyChart"></canvas></div>
-    <div class="panel"><h2>Структура расходов</h2><canvas id="categoryChart"></canvas></div>
+    <div class="panel"><h2>Расходы и доходы по месяцам</h2><div class="chartWrap"><canvas id="monthlyChart"></canvas></div></div>
+    <div class="panel"><h2>Структура расходов</h2><div class="chartWrap"><canvas id="categoryChart"></canvas></div></div>
     <div class="panel wide"><h2>Крупнейшие категории</h2>
       <table><thead><tr><th>Категория</th><th>Тип</th><th class="money">Расходы</th><th class="money">Доля</th></tr></thead>
       <tbody id="categoryTable"></tbody></table>
@@ -79,8 +80,8 @@ let operations = [];
 let monthlyChart = null;
 let categoryChart = null;
 
-const rub = n => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(n||0)+' ₽';
-const parseNum = v => Number(String(v ?? "0").replace(/\s/g,"").replace(",", ".")) || 0;
+const rub = n => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(Number(n)||0)+' ₽';
+const parseNum = v => typeof v === 'number' ? v : (Number(String(v ?? "0").replace(/[^0-9,.-]/g,"").replace(",", ".")) || 0);
 
 function initAuth(){
   if (!window.google?.accounts?.oauth2) return setTimeout(initAuth, 200);
@@ -103,28 +104,34 @@ document.getElementById("authBtn").onclick = () => {
 };
 
 async function loadSheet(){
-  setStatus("Загружаю API_дашборд…");
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${encodeURIComponent(CONFIG.RANGE)}?majorDimension=ROWS`;
-  const r = await fetch(url,{headers:{Authorization:`Bearer ${accessToken}`}});
-  if (!r.ok) {
-    const t = await r.text();
-    setStatus(`Ошибка Sheets API ${r.status}: ${t.slice(0,180)}`);
-    return;
+  try {
+    setStatus("Загружаю API_дашборд…");
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${encodeURIComponent(CONFIG.RANGE)}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`;
+    const r = await fetch(url,{headers:{Authorization:`Bearer ${accessToken}`}});
+    if (!r.ok) {
+      const t = await r.text();
+      setStatus(`Ошибка Sheets API ${r.status}: ${t.slice(0,220)}`);
+      return;
+    }
+    const data = await r.json();
+    const rows = data.values || [];
+    if (rows.length < 2) return setStatus("API_дашборд пуст");
+    const h = rows[0];
+    operations = rows.slice(1).map(row => Object.fromEntries(h.map((k,i)=>[k,row[i] ?? ""])));
+    populateYears();
+    render();
+    const latest = operations.reduce((max,x)=>Math.max(max,Number(x["Дата"])||0),0);
+    setStatus(`Загружено операций: ${operations.length.toLocaleString('ru-RU')} · источник обновлён`);
+  } catch (e) {
+    console.error(e);
+    setStatus("Ошибка загрузки данных: "+e.message);
   }
-  const data = await r.json();
-  const rows = data.values || [];
-  if (rows.length < 2) return setStatus("API_дашборд пуст");
-  const h = rows[0];
-  operations = rows.slice(1).map(row => Object.fromEntries(h.map((k,i)=>[k,row[i] ?? ""])));
-  populateYears();
-  render();
-  setStatus(`Загружено операций: ${operations.length.toLocaleString('ru-RU')}`);
 }
 
 function populateYears(){
-  const years = [...new Set(operations.map(x=>String(x["Год"])).filter(Boolean))].sort((a,b)=>b-a);
+  const years = [...new Set(operations.map(x=>String(x["Год"])).filter(Boolean))].sort((a,b)=>Number(b)-Number(a));
   const s = document.getElementById("yearFilter");
-  const current = s.value || years[0];
+  const current = s.value && years.includes(s.value) ? s.value : years[0];
   s.innerHTML = years.map(y=>`<option ${y===current?'selected':''}>${y}</option>`).join("");
 }
 
@@ -147,7 +154,10 @@ function render(){
   const inc=incRows.reduce((a,x)=>a+parseNum(x["Сумма, ₽"]),0);
   const core=expRows.filter(x=>x["Группа бюджета"]!=="Крупные проекты").reduce((a,x)=>a+parseNum(x["Сумма, ₽"]),0);
 
-  expenses.textContent=rub(exp); income.textContent=rub(inc); net.textContent=rub(inc-exp); core.textContent=rub(core);
+  document.getElementById('expenses').textContent=rub(exp);
+  document.getElementById('income').textContent=rub(inc);
+  document.getElementById('net').textContent=rub(inc-exp);
+  document.getElementById('core').textContent=rub(core);
 
   const monthMap={};
   for(let i=1;i<=12;i++) monthMap[String(i).padStart(2,"0")]={e:0,i:0};
@@ -164,7 +174,7 @@ function render(){
       {label:"Расходы",data:Object.values(monthMap).map(x=>x.e),borderRadius:5},
       {label:"Доходы",data:Object.values(monthMap).map(x=>x.i),borderRadius:5}
     ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}
+    options:{responsive:true,maintainAspectRatio:false,resizeDelay:150,plugins:{legend:{position:"bottom"}}}
   });
 
   const cats={};
@@ -177,16 +187,17 @@ function render(){
   categoryChart?.destroy();
   categoryChart=new Chart(document.getElementById("categoryChart"),{
     type:"doughnut",data:{labels:top.map(x=>x[0]),datasets:[{data:top.map(x=>x[1]),borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:"67%",plugins:{legend:{position:"bottom"}}}
+    options:{responsive:true,maintainAspectRatio:false,resizeDelay:150,cutout:"67%",plugins:{legend:{position:"bottom"}}}
   });
 
   const groupByCategory={};
   expRows.forEach(x=>{ if(!groupByCategory[x["Категория"]]) groupByCategory[x["Категория"]]=x["Группа бюджета"]||""; });
-  categoryTable.innerHTML="";
+  const tbody=document.getElementById('categoryTable');
+  tbody.innerHTML="";
   sorted.slice(0,15).forEach(([name,sum])=>{
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${name}</td><td><span class="badge">${groupByCategory[name]||"—"}</span></td><td class="money">${rub(sum)}</td><td class="money">${exp? (sum/exp*100).toFixed(1):"0.0"}%</td>`;
-    categoryTable.appendChild(tr);
+    tbody.appendChild(tr);
   });
 }
 
