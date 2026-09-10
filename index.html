@@ -24,9 +24,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 8px;
 </head>
 <body>
 <div class="wrap">
-  <div class="notice" id="configNotice">
-    Для живого подключения укажите Google OAuth Client ID в <b>CONFIG.CLIENT_ID</b> и откройте страницу с разрешённого HTTPS-origin.
-  </div>
+  <div class="notice hidden" id="configNotice"></div>
 
   <div class="top">
     <div>
@@ -69,7 +67,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 8px;
 
 <script>
 const CONFIG = {
-  CLIENT_ID: "PASTE_GOOGLE_OAUTH_CLIENT_ID_HERE",
+  CLIENT_ID: "281194888037-hi3ftrf91fojavivh2rq0hvntlvqugb5.apps.googleusercontent.com",
   SPREADSHEET_ID: "1XnqDNVnb7S9GiqzW8WZ1DgoC0vGbmO3XED5QLTgOiIc",
   RANGE: "API_дашборд!A:P",
   SCOPES: "https://www.googleapis.com/auth/spreadsheets.readonly"
@@ -93,7 +91,6 @@ function initAuth(){
       if (resp.error) { setStatus("Ошибка OAuth: "+resp.error); return; }
       accessToken = resp.access_token;
       document.getElementById("authBtn").textContent = "Обновить данные";
-      document.getElementById("configNotice").classList.add("hidden");
       await loadSheet();
     }
   });
@@ -101,10 +98,6 @@ function initAuth(){
 initAuth();
 
 document.getElementById("authBtn").onclick = () => {
-  if (CONFIG.CLIENT_ID.includes("PASTE_")) {
-    setStatus("Сначала укажите OAuth Client ID в CONFIG.CLIENT_ID");
-    return;
-  }
   if (!tokenClient) return setStatus("Google Identity Services ещё загружается");
   tokenClient.requestAccessToken({prompt: accessToken ? "" : "consent"});
 };
