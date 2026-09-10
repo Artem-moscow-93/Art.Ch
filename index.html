@@ -120,7 +120,6 @@ async function loadSheet(){
     operations = rows.slice(1).map(row => Object.fromEntries(h.map((k,i)=>[k,row[i] ?? ""])));
     populateYears();
     render();
-    const latest = operations.reduce((max,x)=>Math.max(max,Number(x["Дата"])||0),0);
     setStatus(`Загружено операций: ${operations.length.toLocaleString('ru-RU')} · источник обновлён`);
   } catch (e) {
     console.error(e);
@@ -159,8 +158,8 @@ function render(){
   document.getElementById('net').textContent=rub(inc-exp);
   document.getElementById('core').textContent=rub(core);
 
-  const monthMap={};
-  for(let i=1;i<=12;i++) monthMap[String(i).padStart(2,"0")]={e:0,i:0};
+  const monthKeys = Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0"));
+  const monthMap = Object.fromEntries(monthKeys.map(k=>[k,{e:0,i:0}]));
   rows.forEach(x=>{
     const mm=String(x["Месяц"]).slice(-2);
     if(!monthMap[mm]) return;
@@ -171,8 +170,8 @@ function render(){
   monthlyChart?.destroy();
   monthlyChart=new Chart(document.getElementById("monthlyChart"),{
     type:"bar",data:{labels,datasets:[
-      {label:"Расходы",data:Object.values(monthMap).map(x=>x.e),borderRadius:5},
-      {label:"Доходы",data:Object.values(monthMap).map(x=>x.i),borderRadius:5}
+      {label:"Расходы",data:monthKeys.map(k=>monthMap[k].e),borderRadius:5},
+      {label:"Доходы",data:monthKeys.map(k=>monthMap[k].i),borderRadius:5}
     ]},
     options:{responsive:true,maintainAspectRatio:false,resizeDelay:150,plugins:{legend:{position:"bottom"}}}
   });
