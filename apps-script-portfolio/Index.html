@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Инвестиционный портфель — dashboard</title>
+<style>
+:root{
+  --bg:#f5f7fb; --card:#ffffff; --text:#18212f; --muted:#718096; --line:#e8edf4;
+  --pos:#14804a; --neg:#c43b46; --accent:#315efb; --accent-soft:#edf2ff; --warn:#b7791f;
+  --shadow:0 6px 24px rgba(30,50,90,.08);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.wrap{max-width:1500px;margin:0 auto;padding:28px}
+header{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:20px}
+h1{font-size:28px;line-height:1.1;margin:0 0 6px;font-weight:780;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:13px}
+.badge{background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:7px 11px;font-size:12px;font-weight:700}
+.grid{display:grid;gap:14px}
+.kpi{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+.kpi-card{padding:17px 18px}
+.label{font-size:12px;color:var(--muted);font-weight:650;margin-bottom:8px}
+.big{font-size:25px;font-weight:780;letter-spacing:-.02em}
+.delta{font-size:12px;margin-top:7px}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .muted{color:var(--muted)}
+.accounts{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:14px}
+.account{padding:16px 18px}
+.account-line{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.frozen-value{font-size:12px;font-weight:600;white-space:nowrap}
+.account .value{font-size:20px;font-weight:760;margin:4px 0 8px}
+.account-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.two{grid-template-columns:1fr;margin-bottom:14px}
+.panel{padding:18px}
+.panel h2{font-size:15px;margin:0 0 14px;font-weight:760}
+.stack{height:18px;border-radius:999px;overflow:hidden;display:flex;background:#eef1f6}
+.stack span{height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.bench{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.market-row{margin-bottom:14px}
+.market-row .note{font-size:10px;line-height:1.35;overflow-wrap:anywhere}
+.bench-card{min-width:0;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.bench-title{font-size:12px;color:var(--muted);font-weight:700}
+.bench-value{font-size:18px;font-weight:760;margin-top:4px}
+.toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.search{width:min(420px,100%);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+select{padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text)}
+.table-card{padding:18px}
+.table-wrap{overflow:auto;max-height:650px;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{position:sticky;top:0;background:#f8fafc;z-index:1;color:#657186;text-align:left;font-size:11px;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px;border-bottom:1px solid #f0f3f7;white-space:nowrap}
+td.name{white-space:normal;min-width:220px}
+td.num,th.num{text-align:right}
+tr:hover td{background:#fbfcff}
+.position-group{cursor:pointer}
+.position-group td{font-weight:650}
+.position-toggle{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;cursor:pointer;padding:4px 0;display:inline-flex;align-items:center;gap:7px}
+.position-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:3px}
+.position-child td{background:#f8fafc;color:var(--muted)}
+.position-child td.pos{color:var(--pos)}.position-child td.neg{color:var(--neg)}
+.position-child td:first-child{padding-left:28px}
+.position-help{font-size:11px;font-weight:400;color:var(--muted)}
+.note{font-size:12px;color:var(--muted);line-height:1.5}
+.footer{margin-top:14px;color:var(--muted);font-size:11px}
+@media(max-width:1050px){.kpi,.accounts{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+@media(max-width:650px){.bench{gap:6px}.bench-card{padding:8px}.bench-title{font-size:10px}.bench-value{font-size:16px}.wrap{padding:14px}.kpi,.accounts{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}.toolbar{align-items:stretch;flex-direction:column}.filters{width:100%}select{flex:1}}
+.login-overlay{min-height:100dvh;display:grid;place-items:center;padding:24px}
+.login-overlay[hidden],#app[hidden]{display:none}
+.login-card{width:min(420px,100%);padding:30px;background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
+.login-card h1{font-size:24px;margin:0 0 10px}
+.login-card p{color:var(--muted);font-size:14px;line-height:1.5;margin:0 0 22px}
+.login-card label{display:block;font-size:13px;font-weight:650;margin-bottom:7px}
+.login-card input,.login-card button{width:100%;font:inherit;border-radius:10px;padding:12px}
+.login-card input{border:1px solid #ccd4df}
+.login-card button{margin-top:12px;border:0;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
+.login-card button:disabled{opacity:.6}
+#loginStatus{min-height:20px;margin-top:10px;color:var(--neg);font-size:13px}
+</style>
+</head>
+<body>
+<section id="loginOverlay" class="login-overlay">
+  <form id="loginForm" class="login-card">
+    <h1>Инвестиционный портфель</h1>
+    <p>Введите пароль, чтобы загрузить актуальные данные.</p>
+    <label for="portfolioPassword">Пароль</label>
+    <input id="portfolioPassword" type="password" autocomplete="current-password" required autofocus>
+    <button id="loginButton" type="submit">Открыть портфель</button>
+    <div id="loginStatus" role="status" aria-live="polite"></div>
+  </form>
+</section>
+<div class="wrap" id="app" hidden>
+<header>
+  <div>
+    <h1>Инвестиционный портфель</h1>
+    <div class="sub">Срез из Google Sheets · <span id="asOf"></span> · источник истины: «Периоды_владения»</div>
+  </div>
+  <div class="badge">Apps Script · актуальные данные</div>
+</header>
+
+<section class="bench market-row" aria-label="Рынок и курс — на сегодня">
+      <div class="card bench-card"><div class="bench-title">IMOEX</div><div class="bench-value" id="imoexVal">загрузка…</div><div class="note" id="imoexDate" style="margin-top:4px"></div></div>
+      <div class="card bench-card"><div class="bench-title">RGBI</div><div class="bench-value" id="rgbiVal">загрузка…</div><div class="note" id="rgbiDate" style="margin-top:4px"></div></div>
+      <div class="card bench-card"><div class="bench-title">USD/RUB · курс ЦБ</div><div class="bench-value" id="usdVal">загрузка…</div><div class="note" id="usdDate" style="margin-top:4px"></div></div>
+</section>
+
+<section class="grid kpi">
+  <div class="card kpi-card"><div class="label">Текущий NAV</div><div class="big" id="nav"></div><div class="delta muted">по открытым позициям</div></div>
+  <div class="card kpi-card"><div class="label">P&L с момента покупки</div><div class="big" id="pnl"></div><div class="delta" id="ret"></div></div>
+</section>
+
+<section class="grid accounts" id="accounts"></section>
+
+<section class="grid two">
+  <div class="card panel">
+    <h2>Структура текущего NAV</h2>
+    <div class="stack" id="allocation"></div>
+    <div class="legend" id="allocationLegend"></div>
+    <div class="note" style="margin-top:15px">P&L включает продажи и выплаты за период владения. Доходность бумаги рассчитывается как суммарный P&L / суммарные затраты на покупки за эти периоды; проценты по счетам не усредняются.</div>
+  </div>
+</section>
+
+<section class="card table-card">
+  <div class="toolbar">
+    <div>
+      <h2 style="margin:0 0 3px;font-size:15px">Открытые позиции — по бумагам</h2>
+      <div class="sub">Нажмите на бумагу, чтобы увидеть позиции по счетам. Итоги учитывают выбранные фильтры.</div>
+    </div>
+    <input class="search" id="search" placeholder="Поиск по бумаге / тикеру">
+  </div>
+  <div class="filters" style="margin-bottom:12px">
+    <select id="assetType" aria-label="Тип актива"><option value="">Все типы активов</option><option>Акции</option><option>Облигации</option><option>Фонды</option></select>
+    <select id="owner"><option value="">Все владельцы</option><option>Артем</option><option>Тамара</option></select>
+    <select id="account"><option value="">Все счета</option><option>ИИС</option><option>Брок. счет</option></select>
+    <select id="sort">
+      <option value="value">Сортировка: стоимость</option>
+      <option value="retDesc">Доходность: лучшие</option>
+      <option value="retAsc">Доходность: худшие</option>
+      <option value="pnl">P&L</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Тикер</th><th>Бумага</th><th>Счета</th><th class="num">Кол-во</th><th class="num" title="Сумма затрат на покупки за период владения, включая впоследствии проданную часть">Объём вложений</th><th class="num">Открытая позиция</th><th class="num">Выплаты</th>
+        <th class="num">P&L</th><th class="num">Доходность</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</section>
+<div class="footer">Данные портфеля встроены как снапшот из файла. Индексы: <a href="https://www.moex.com/">Московская биржа</a>. Курс: ЦБ РФ; резервный <a href="https://www.cbr-xml-daily.com/">API для курсов ЦБ РФ</a>. Рыночные значения обновляются при открытии страницы; дата данных указана в каждой карточке. При недоступности источника значение не подставляется.</div>
+</div>
+
+<script>
+let DATA;
+
+function initDashboard(data){
+DATA=data;
+const rub = v => new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:0}).format(v||0);
+const pct = v => new Intl.NumberFormat('ru-RU',{style:'percent',maximumFractionDigits:1,signDisplay:'always'}).format(v||0);
+const num = v => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(v||0);
+const cls = v => v>=0?'pos':'neg';
+
+document.getElementById('asOf').textContent = DATA.asOf;
+document.getElementById('nav').textContent = rub(DATA.totalNav);
+const pnlEl=document.getElementById('pnl'); pnlEl.textContent=rub(DATA.totalPnl); pnlEl.className='big '+cls(DATA.totalPnl);
+const retEl=document.getElementById('ret'); retEl.textContent=pct(DATA.totalReturn)+' на вложенный cost basis'; retEl.className='delta '+cls(DATA.totalReturn);
+
+document.getElementById('accounts').innerHTML = DATA.accounts.map(a=>`
+  <div class="card account">
+    <div class="label">${a.label}</div>
+    <div class="account-line"><div class="value">${rub(a.nav)}</div>${a.frozenNav!==undefined?`<span class="frozen-value muted" title="В том числе стоимость заблокированных активов">(${rub(a.frozenNav)})</span>`:''}</div>
+    <div class="account-line"><span class="${cls(a.pnl)}" style="font-size:13px;font-weight:700">${rub(a.pnl)} · ${pct(a.ret)}</span>${a.frozenPnl!==undefined?`<span class="frozen-value ${cls(a.frozenPnl)}" title="P&L периодов владения заблокированными позициями, включая продажи и выплаты">(${rub(a.frozenPnl)})</span>`:''}</div>
+    <div class="account-meta"><span>${a.positions} позиций</span>${a.frozenNav!==undefined?'<span>В скобках — заблокированные</span>':''}</div>
+  </div>`).join('');
+
+const allocColors={'Акции':'#315efb','Облигации':'#12a879','Фонды':'#8b5cf6','Прочее':'#cbd5e1'};
+const alloc=Object.entries(DATA.typeTotals).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+document.getElementById('allocation').innerHTML=alloc.map(([k,v])=>`<span style="width:${(v/DATA.totalNav*100).toFixed(2)}%;background:${allocColors[k]||'#999'}"></span>`).join('');
+document.getElementById('allocationLegend').innerHTML=alloc.map(([k,v])=>`<span><i class="dot" style="background:${allocColors[k]||'#999'}"></i>${k}: ${rub(v)} · ${(v/DATA.totalNav*100).toFixed(1)}%</span>`).join('');
+
+const expandedAssets=new Set();
+const escapeHtml = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function groupPositions(positions){
+  const groups=new Map();
+  for(const x of positions){
+    const key=x.assetId||JSON.stringify([x.ticker,x.name]);
+    if(!groups.has(key)) groups.set(key,{key,ticker:x.ticker,name:x.name,assetType:x.assetType,qty:0,value:0,pnl:0,income:0,returnBasis:0,children:[]});
+    const g=groups.get(key);
+    for(const field of ['qty','value','pnl','income','returnBasis']) g[field]+=x[field];
+    g.children.push(x);
+  }
+  return [...groups.values()].map(g=>({...g,ret:g.returnBasis?g.pnl/g.returnBasis:null}));
+}
+function renderRows(){
+  const q=document.getElementById('search').value.toLowerCase().trim();
+  const assetType=document.getElementById('assetType').value;
+  const owner=document.getElementById('owner').value;
+  const account=document.getElementById('account').value;
+  const sort=document.getElementById('sort').value;
+  const positions=DATA.positions.filter(x=>(!assetType||x.assetType===assetType)&&(!owner||x.owner===owner)&&(!account||x.account===account)&&(!q||(x.name+' '+x.ticker).toLowerCase().includes(q)));
+  const groups=groupPositions(positions);
+  if(sort==='retDesc') groups.sort((a,b)=>(b.ret??-Infinity)-(a.ret??-Infinity));
+  else if(sort==='retAsc') groups.sort((a,b)=>(a.ret??Infinity)-(b.ret??Infinity));
+  else if(sort==='pnl') groups.sort((a,b)=>b.pnl-a.pnl);
+  else groups.sort((a,b)=>b.value-a.value);
+  function numbers(x){
+    return `<td class="num">${num(x.qty)}</td>
+      <td class="num">${rub(x.returnBasis)}</td>
+      <td class="num"><b>${rub(x.value)}</b></td>
+      <td class="num">${rub(x.income)}</td>
+      <td class="num ${cls(x.pnl)}">${rub(x.pnl)}</td>
+      <td class="num ${cls(x.ret)}"><b>${x.ret===null?'—':pct(x.ret)}</b></td>`;
+  }
+  document.getElementById('tbody').innerHTML=groups.map((g,index)=>{
+    const open=expandedAssets.has(g.key);
+    const children=g.children.slice().sort((a,b)=>a.owner.localeCompare(b.owner,'ru')||a.account.localeCompare(b.account,'ru'));
+    const count=new Set(children.map(x=>x.owner+'|'+x.account)).size;
+    const childIds=children.map((_,i)=>`position-${index}-${i}`).join(' ');
+    return `<tr class="position-group" data-asset="${escapeHtml(g.key)}">
+      <td><button class="position-toggle" type="button" aria-expanded="${open}" aria-controls="${childIds}" aria-label="${open?'Свернуть':'Раскрыть'} ${escapeHtml(g.name)}"><span aria-hidden="true">${open?'▾':'▸'}</span>${escapeHtml(g.ticker)}</button></td>
+      <td class="name">${escapeHtml(g.name)}<div class="position-help">${escapeHtml(g.assetType)}</div></td><td><span class="position-help">Счетов: ${count}</span></td>${numbers(g)}</tr>`+
+      children.map((x,i)=>`<tr class="position-child" id="position-${index}-${i}" ${open?'':'hidden'}><td></td><td class="name">${escapeHtml(x.owner)}</td><td>${escapeHtml(x.account)}</td>${numbers(x)}</tr>`).join('');
+  }).join('') || '<tr><td colspan="9" class="muted">По выбранным фильтрам позиций нет</td></tr>';
+}
+document.getElementById('tbody').addEventListener('click',event=>{
+  const row=event.target.closest('.position-group');
+  if(!row)return;
+  const key=row.dataset.asset;
+  if(expandedAssets.has(key))expandedAssets.delete(key);else expandedAssets.add(key);
+  const restoreFocus=!!event.target.closest('button');
+  renderRows();
+  if(restoreFocus)Array.from(document.querySelectorAll('.position-group')).find(x=>x.dataset.asset===key)?.querySelector('button').focus();
+});
+['search','assetType','owner','account','sort'].forEach(id=>document.getElementById(id).addEventListener(id==='search'?'input':'change',renderRows));
+renderRows();
+}
+
+const moscowToday = () => new Intl.DateTimeFormat('sv-SE', {timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+function dateLabel(date){
+  const m=String(date||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : String(date||'дата не указана');
+}
+async function fetchMarket(url, asText=false){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),12000);
+  try {
+    const response=await fetch(url,{signal:controller.signal,cache:'no-store'});
+    if(!response.ok) throw new Error('HTTP '+response.status);
+    return await (asText?response.text():response.json());
+  } finally {clearTimeout(timeout)}
+}
+function tableObjects(table){
+  return (table?.data||[]).map(row=>Object.fromEntries(table.columns.map((key,i)=>[key,row[i]])));
+}
+function validQuote(value){return value!==null && value!==undefined && value!=='' && Number.isFinite(Number(value)) && Number(value)>0}
+async function indexQuote(security){
+  const j=await fetchMarket(`https://iss.moex.com/iss/engines/stock/markets/index/securities/${security}.json?iss.meta=off&iss.only=marketdata,securities`);
+  const market=tableObjects(j.marketdata).filter(x=>x.SECID===security);
+  for(const row of market){
+    const value=row.CURRENTVALUE;
+    const stamp=row.TRADEDATE||row.SYSTIME;
+    if(validQuote(value)&&stamp){
+      return {value:Number(value),date:String(stamp).slice(0,10),time:row.UPDATETIME||String(row.SYSTIME||'').slice(11,19),source:'Мосбиржа · возможна задержка'};
+    }
+  }
+  const previous=tableObjects(j.securities).find(x=>x.SECID===security&&validQuote(x.PREVPRICE)&&x.PREVDATE);
+  if(previous) return {value:Number(previous.PREVPRICE),date:previous.PREVDATE,source:'Мосбиржа · последнее закрытие'};
+  throw new Error('Нет котировки с датой');
+}
+async function usdQuote(){
+  const today=moscowToday();
+  try {
+    const date=today.split('-').reverse().join('/');
+    const xml=await fetchMarket(`https://www.cbr.ru/scripts/XML_daily.asp?date_req=${date}`,true);
+    const doc=new DOMParser().parseFromString(xml,'text/xml');
+    const usd=Array.from(doc.querySelectorAll('Valute')).find(x=>x.querySelector('CharCode')?.textContent==='USD');
+    const value=Number(usd?.querySelector('Value')?.textContent.replace(',','.'))/Number(usd?.querySelector('Nominal')?.textContent);
+    const effective=doc.documentElement.getAttribute('Date')?.split('.').reverse().join('-');
+    if(validQuote(value)&&effective&&effective<=today) return {value,date:effective,source:'Официальный курс ЦБ РФ'};
+  } catch(e) { /* The CBR endpoint may disallow browser cross-origin requests. */ }
+  const j=await fetchMarket('https://www.cbr-xml-daily.com/daily_json.js');
+  const future=String(j.Date).slice(0,10)>today;
+  const date=String(future?j.PreviousDate:j.Date).slice(0,10);
+  const usd=j.Valute?.USD;
+  const value=Number(future?usd?.Previous:usd?.Value)/Number(usd?.Nominal);
+  if(!validQuote(value)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>today) throw new Error('Нет курса на текущую дату');
+  return {value,date,source:'Курс ЦБ РФ · через API'};
+}
+async function renderMarket(){
+  const ids=['imoex','rgbi','usd'];
+  const results=await Promise.allSettled([indexQuote('IMOEX'),indexQuote('RGBI'),usdQuote()]);
+  results.forEach((result,i)=>{
+    const valueEl=document.getElementById(ids[i]+'Val');
+    const dateEl=document.getElementById(ids[i]+'Date');
+    if(result.status==='fulfilled'){
+      const q=result.value;
+      valueEl.textContent=num(q.value)+(i===2?' ₽':'');
+      dateEl.textContent=`${q.source} · ${dateLabel(q.date)}${q.time?' '+q.time+' МСК':''}${q.date<moscowToday()?' · последние доступные данные':''}`;
+    } else {
+      valueEl.textContent='Недоступно';
+      dateEl.textContent='Не удалось обновить. Откройте страницу повторно.';
+    }
+  });
+}
+
+function showDashboard(payload){
+  sessionStorage.setItem('portfolio_token',payload.token);
+  document.getElementById('loginOverlay').hidden=true;
+  document.getElementById('app').hidden=false;
+  initDashboard(payload.data);
+  renderMarket();
+}
+function showLogin(message=''){
+  document.getElementById('app').hidden=true;
+  document.getElementById('loginOverlay').hidden=false;
+  document.getElementById('loginStatus').textContent=message;
+}
+function failLogin(error){
+  sessionStorage.removeItem('portfolio_token');
+  showLogin(error&&error.message?error.message:'Не удалось загрузить данные');
+  document.getElementById('loginButton').disabled=false;
+  document.getElementById('portfolioPassword').focus();
+}
+document.getElementById('loginForm').addEventListener('submit',event=>{
+  event.preventDefault();
+  const input=document.getElementById('portfolioPassword');
+  document.getElementById('loginButton').disabled=true;
+  document.getElementById('loginStatus').textContent='Открываем…';
+  google.script.run.withSuccessHandler(showDashboard).withFailureHandler(failLogin).login(input.value);
+  input.value='';
+});
+const savedToken=sessionStorage.getItem('portfolio_token');
+if(savedToken){
+  google.script.run.withSuccessHandler(showDashboard).withFailureHandler(()=>showLogin()).getData(savedToken);
+}else showLogin();
+</script>
+</body>
+</html>
