@@ -1,6 +1,9 @@
 const PORTFOLIO_SHEET = 'Портфель';
 const DASHBOARD_SHEET = 'Дашборд';
 const SESSION_DAYS = 30;
+const MARKET_CACHE_SECONDS = 900;
+const MARKET_CACHE_KEY = 'market_data_v2';
+const MARKET_LAST_GOOD_KEY = 'MARKET_LAST_GOOD_V2';
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index')
@@ -21,6 +24,117 @@ function login(password) {
 function getData(token) {
   if (!verifyToken_(token)) throw new Error('Сессия истекла. Введите пароль снова.');
   return { token: token, data: buildDashboardData_() };
+}
+
+function getMarketData(token) {
+  if (!verifyToken_(token)) throw new Error('Сессия истекла. Введите пароль снова.');
+
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(MARKET_CACHE_KEY);
+  if (cached) {
+    const data = JSON.parse(cached);
+    data.cacheHit = true;
+    return data;
+  }
+
+  try {
+    const data = fetchMarketData_();
+    const json = JSON.stringify(data);
+    cache.put(MARKET_CACHE_KEY, json, MARKET_CACHE_SECONDS);
+    PropertiesService.getScriptProperties().setProperty(MARKET_LAST_GOOD_KEY, json);
+    return data;
+  } catch (error) {
+    const lastGood = PropertiesService.getScriptProperties().getProperty(MARKET_LAST_GOOD_KEY);
+    if (lastGood) {
+      const data = JSON.parse(lastGood);
+      data.stale = true;
+      data.error = String(error && error.message || error);
+      return data;
+    }
+    throw new Error('Не удалось получить рыночные данные: ' + String(error && error.message || error));
+  }
+}
+
+function fetchMarketData_() {
+  const today = Utilities.formatDate(new Date(), 'Europe/Moscow', 'yyyy-MM-dd');
+  const cbrDate = today.split('-').reverse().join('/');
+  const requests = [
+    {url: 'https://iss.moex.com/iss/engines/stock/markets/index/securities/IMOEX.json?iss.meta=off&iss.only=marketdata,securities', muteHttpExceptions: true},
+    {url: 'https://iss.moex.com/iss/engines/stock/markets/index/securities/RGBI.json?iss.meta=off&iss.only=marketdata,securities', muteHttpExceptions: true},
+    {url: 'https://www.cbr.ru/scripts/XML_daily.asp?date_req=' + cbrDate, muteHttpExceptions: true}
+  ];
+  const responses = UrlFetchApp.fetchAll(requests);
+  return {
+    imoex: parseMoexIndex_(responses[0], 'IMOEX'),
+    rgbi: parseMoexIndex_(responses[1], 'RGBI'),
+    usd: parseCbrUsd_(responses[2]),
+    fetchedAt: new Date().toISOString(),
+    cacheSeconds: MARKET_CACHE_SECONDS,
+    cacheHit: false,
+    stale: false
+  };
+}
+
+function parseMoexIndex_(response, security) {
+  const status = response.getResponseCode();
+  if (status < 200 || status >= 300) throw new Error(security + ': HTTP ' + status);
+  const json = JSON.parse(response.getContentText());
+  const market = tableObjects_(json.marketdata).filter(row => row.SECID === security);
+  for (let i = 0; i < market.length; i++) {
+    const row = market[i];
+    if (positiveNumber_(row.CURRENTVALUE) && (row.TRADEDATE || row.SYSTIME)) {
+      return {
+        value: Number(row.CURRENTVALUE),
+        date: String(row.TRADEDATE || row.SYSTIME).slice(0, 10),
+        time: row.UPDATETIME || String(row.SYSTIME || '').slice(11, 19),
+        source: 'Мосбиржа · возможна задержка'
+      };
+    }
+  }
+  const previous = tableObjects_(json.securities).find(row =>
+    row.SECID === security && positiveNumber_(row.PREVPRICE) && row.PREVDATE
+  );
+  if (previous) {
+    return {
+      value: Number(previous.PREVPRICE),
+      date: String(previous.PREVDATE).slice(0, 10),
+      source: 'Мосбиржа · последнее закрытие'
+    };
+  }
+  throw new Error(security + ': котировка отсутствует');
+}
+
+function parseCbrUsd_(response) {
+  const status = response.getResponseCode();
+  if (status < 200 || status >= 300) throw new Error('USD/RUB: HTTP ' + status);
+  const xml = response.getBlob().getDataAsString('windows-1251');
+  const root = XmlService.parse(xml).getRootElement();
+  const usd = root.getChildren('Valute').find(node =>
+    node.getChildText('CharCode') === 'USD'
+  );
+  if (!usd) throw new Error('USD/RUB: курс отсутствует');
+  const nominal = Number(String(usd.getChildText('Nominal')).replace(',', '.'));
+  const value = Number(String(usd.getChildText('Value')).replace(',', '.')) / nominal;
+  if (!positiveNumber_(value)) throw new Error('USD/RUB: некорректный курс');
+  const rawDate = root.getAttribute('Date').getValue();
+  return {
+    value: value,
+    date: rawDate.split('.').reverse().join('-'),
+    source: 'Официальный курс ЦБ РФ'
+  };
+}
+
+function tableObjects_(table) {
+  if (!table || !table.columns || !table.data) return [];
+  return table.data.map(row => {
+    const object = {};
+    table.columns.forEach((key, index) => object[key] = row[index]);
+    return object;
+  });
+}
+
+function positiveNumber_(value) {
+  return value !== null && value !== '' && isFinite(Number(value)) && Number(value) > 0;
 }
 
 function buildDashboardData_() {
