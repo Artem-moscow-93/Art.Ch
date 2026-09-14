@@ -152,7 +152,7 @@ tr:hover td{background:#fbfcff}
     </table>
   </div>
 </section>
-<div class="footer">Данные портфеля встроены как снапшот из файла. Индексы: <a href="https://www.moex.com/">Московская биржа</a>. Курс: ЦБ РФ; резервный <a href="https://www.cbr-xml-daily.com/">API для курсов ЦБ РФ</a>. Рыночные значения обновляются при открытии страницы; дата данных указана в каждой карточке. При недоступности источника значение не подставляется.</div>
+<div class="footer">Данные портфеля загружаются из Google Sheets. Рыночные данные запрашиваются сервером и кэшируются на 15 минут. Индексы: <a href="https://www.moex.com/">Московская биржа</a>. Курс: ЦБ РФ; резервный <a href="https://www.cbr-xml-daily.com/">API для курсов ЦБ РФ</a>. Дата данных указана в каждой карточке. При сбое источника показываются последние успешно сохранённые значения.</div>
 </div>
 
 <script>
@@ -245,67 +245,47 @@ function dateLabel(date){
   const m=String(date||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}.${m[2]}.${m[1]}` : String(date||'дата не указана');
 }
-async function fetchMarket(url, asText=false){
-  const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),12000);
-  try {
-    const response=await fetch(url,{signal:controller.signal,cache:'no-store'});
-    if(!response.ok) throw new Error('HTTP '+response.status);
-    return await (asText?response.text():response.json());
-  } finally {clearTimeout(timeout)}
-}
-function tableObjects(table){
-  return (table?.data||[]).map(row=>Object.fromEntries(table.columns.map((key,i)=>[key,row[i]])));
-}
-function validQuote(value){return value!==null && value!==undefined && value!=='' && Number.isFinite(Number(value)) && Number(value)>0}
-async function indexQuote(security){
-  const j=await fetchMarket(`https://iss.moex.com/iss/engines/stock/markets/index/securities/${security}.json?iss.meta=off&iss.only=marketdata,securities`);
-  const market=tableObjects(j.marketdata).filter(x=>x.SECID===security);
-  for(const row of market){
-    const value=row.CURRENTVALUE;
-    const stamp=row.TRADEDATE||row.SYSTIME;
-    if(validQuote(value)&&stamp){
-      return {value:Number(value),date:String(stamp).slice(0,10),time:row.UPDATETIME||String(row.SYSTIME||'').slice(11,19),source:'Мосбиржа · возможна задержка'};
-    }
-  }
-  const previous=tableObjects(j.securities).find(x=>x.SECID===security&&validQuote(x.PREVPRICE)&&x.PREVDATE);
-  if(previous) return {value:Number(previous.PREVPRICE),date:previous.PREVDATE,source:'Мосбиржа · последнее закрытие'};
-  throw new Error('Нет котировки с датой');
-}
-async function usdQuote(){
-  const today=moscowToday();
-  try {
-    const date=today.split('-').reverse().join('/');
-    const xml=await fetchMarket(`https://www.cbr.ru/scripts/XML_daily.asp?date_req=${date}`,true);
-    const doc=new DOMParser().parseFromString(xml,'text/xml');
-    const usd=Array.from(doc.querySelectorAll('Valute')).find(x=>x.querySelector('CharCode')?.textContent==='USD');
-    const value=Number(usd?.querySelector('Value')?.textContent.replace(',','.'))/Number(usd?.querySelector('Nominal')?.textContent);
-    const effective=doc.documentElement.getAttribute('Date')?.split('.').reverse().join('-');
-    if(validQuote(value)&&effective&&effective<=today) return {value,date:effective,source:'Официальный курс ЦБ РФ'};
-  } catch(e) { /* The CBR endpoint may disallow browser cross-origin requests. */ }
-  const j=await fetchMarket('https://www.cbr-xml-daily.com/daily_json.js');
-  const future=String(j.Date).slice(0,10)>today;
-  const date=String(future?j.PreviousDate:j.Date).slice(0,10);
-  const usd=j.Valute?.USD;
-  const value=Number(future?usd?.Previous:usd?.Value)/Number(usd?.Nominal);
-  if(!validQuote(value)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>today) throw new Error('Нет курса на текущую дату');
-  return {value,date,source:'Курс ЦБ РФ · через API'};
-}
-async function renderMarket(){
+function renderMarket(token){
   const ids=['imoex','rgbi','usd'];
-  const results=await Promise.allSettled([indexQuote('IMOEX'),indexQuote('RGBI'),usdQuote()]);
-  results.forEach((result,i)=>{
-    const valueEl=document.getElementById(ids[i]+'Val');
-    const dateEl=document.getElementById(ids[i]+'Date');
-    if(result.status==='fulfilled'){
-      const q=result.value;
-      valueEl.textContent=num(q.value)+(i===2?' ₽':'');
-      dateEl.textContent=`${q.source} · ${dateLabel(q.date)}${q.time?' '+q.time+' МСК':''}${q.date<moscowToday()?' · последние доступные данные':''}`;
-    } else {
-      valueEl.textContent='Недоступно';
-      dateEl.textContent='Не удалось обновить. Откройте страницу повторно.';
-    }
-  });
+  const marketNumber=value=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Number(value)||0);
+  let settled=false;
+  const timeout=setTimeout(()=>{
+    if(settled)return;
+    ids.forEach(id=>{
+      document.getElementById(id+'Val').textContent='Недоступно';
+      document.getElementById(id+'Date').textContent='Сервер не ответил вовремя. Обновите страницу.';
+    });
+  },20000);
+
+  google.script.run
+    .withSuccessHandler(data=>{
+      settled=true;
+      clearTimeout(timeout);
+      ids.forEach((id,i)=>{
+        const q=data[id];
+        const valueEl=document.getElementById(id+'Val');
+        const dateEl=document.getElementById(id+'Date');
+        if(!q){
+          valueEl.textContent='Недоступно';
+          dateEl.textContent='Данные отсутствуют';
+          return;
+        }
+        valueEl.textContent=marketNumber(q.value)+(i===2?' ₽':'');
+        const lag=q.date<moscowToday()?' · последние доступные данные':'';
+        const cache=data.cacheHit?' · кэш до 15 минут':'';
+        const stale=data.stale?' · сохранённые данные':'';
+        dateEl.textContent=`${q.source} · ${dateLabel(q.date)}${q.time?' '+q.time+' МСК':''}${lag}${cache}${stale}`;
+      });
+    })
+    .withFailureHandler(error=>{
+      settled=true;
+      clearTimeout(timeout);
+      ids.forEach(id=>{
+        document.getElementById(id+'Val').textContent='Недоступно';
+        document.getElementById(id+'Date').textContent=error&&error.message?error.message:'Не удалось обновить данные';
+      });
+    })
+    .getMarketData(token);
 }
 
 function showDashboard(payload){
@@ -313,7 +293,7 @@ function showDashboard(payload){
   document.getElementById('loginOverlay').hidden=true;
   document.getElementById('app').hidden=false;
   initDashboard(payload.data);
-  renderMarket();
+  renderMarket(payload.token);
 }
 function showLogin(message=''){
   document.getElementById('app').hidden=true;
