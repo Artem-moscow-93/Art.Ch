@@ -50,6 +50,8 @@ h1{font-size:28px;line-height:1.1;margin:0 0 6px;font-weight:780;letter-spacing:
 select{padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text)}
 .table-card{padding:18px}
 .table-wrap{overflow:auto;max-height:650px;border:1px solid var(--line);border-radius:12px}
+.closed-table-wrap{max-height:520px}
+.rank{color:var(--muted);font-weight:700}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{position:sticky;top:0;background:#f8fafc;z-index:1;color:#657186;text-align:left;font-size:11px;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:10px;border-bottom:1px solid #f0f3f7;white-space:nowrap}
@@ -152,6 +154,25 @@ tr:hover td{background:#fbfcff}
     </table>
   </div>
 </section>
+
+<section class="card table-card" style="margin-top:14px">
+  <div class="toolbar">
+    <div>
+      <h2 style="margin:0 0 3px;font-size:15px">Закрытые сделки — <span id="closedYear"></span></h2>
+      <div class="sub">Периоды владения, закрытые за календарный год. Ранжирование — по модулю P&amp;L, знак результата сохранён.</div>
+    </div>
+  </div>
+  <div class="table-wrap closed-table-wrap">
+    <table>
+      <thead><tr>
+        <th class="num">#</th><th>Закрытие</th><th>Тикер</th><th>Бумага</th><th>Владелец · счёт</th>
+        <th class="num">Вложено</th><th class="num">Продажи net</th><th class="num">Выплаты</th>
+        <th class="num">P&amp;L</th><th class="num">Доходность</th>
+      </tr></thead>
+      <tbody id="closedTbody"></tbody>
+    </table>
+  </div>
+</section>
 <div class="footer">Данные портфеля загружаются из Google Sheets. Рыночные данные запрашиваются сервером и кэшируются на 15 минут. Индексы: <a href="https://www.moex.com/">Московская биржа</a>. Курс: ЦБ РФ; резервный <a href="https://www.cbr-xml-daily.com/">API для курсов ЦБ РФ</a>. Дата данных указана в каждой карточке. При сбое источника показываются последние успешно сохранённые значения.</div>
 </div>
 
@@ -185,6 +206,23 @@ document.getElementById('allocationLegend').innerHTML=alloc.map(([k,v])=>`<span>
 
 const expandedAssets=new Set();
 const escapeHtml = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+document.getElementById('closedYear').textContent=DATA.closedYear;
+const closedTrades=Array.isArray(DATA.closedTrades)?DATA.closedTrades:[];
+document.getElementById('closedTbody').innerHTML=closedTrades.map((x,index)=>`
+  <tr>
+    <td class="num rank">${index+1}</td>
+    <td>${dateLabel(x.exitDate)}</td>
+    <td><b>${escapeHtml(x.ticker)}</b></td>
+    <td class="name">${escapeHtml(x.name)}<div class="position-help">${escapeHtml(x.assetType)}</div></td>
+    <td>${escapeHtml(x.owner)} · ${escapeHtml(x.account)}</td>
+    <td class="num">${rub(x.costBasis)}</td>
+    <td class="num">${rub(x.saleNet)}</td>
+    <td class="num">${rub(x.income)}</td>
+    <td class="num ${cls(x.pnl)}"><b>${rub(x.pnl)}</b></td>
+    <td class="num ${cls(x.ret)}"><b>${x.ret===null?'—':pct(x.ret)}</b></td>
+  </tr>`).join('') || '<tr><td colspan="10" class="muted">В этом году закрытых сделок нет</td></tr>';
+
 function groupPositions(positions){
   const groups=new Map();
   for(const x of positions){
