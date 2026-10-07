@@ -1,4 +1,6 @@
 const PORTFOLIO_SHEET = 'Портфель';
+const HOLDING_PERIODS_SHEET = 'Периоды_владения';
+const ASSETS_SHEET = 'Справочник_активов';
 const DASHBOARD_SHEET = 'Дашборд';
 const SESSION_DAYS = 30;
 const MARKET_CACHE_SECONDS = 900;
@@ -211,6 +213,9 @@ function buildDashboardData_() {
     if (candidate instanceof Date && !isNaN(candidate)) asOf = candidate;
   }
 
+  const closedYear = Number(Utilities.formatDate(asOf, ss.getSpreadsheetTimeZone(), 'yyyy'));
+  const closedTrades = buildClosedTrades_(ss, closedYear);
+
   return {
     asOf: Utilities.formatDate(asOf, ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd'),
     totalNav: totalNav,
@@ -218,8 +223,104 @@ function buildDashboardData_() {
     totalReturn: totalBasis ? totalPnl / totalBasis : 0,
     accounts: accounts,
     typeTotals: typeTotals,
-    positions: positions
+    positions: positions,
+    closedYear: closedYear,
+    closedTrades: closedTrades
   };
+}
+
+function buildClosedTrades_(ss, year) {
+  const periodsSheet = ss.getSheetByName(HOLDING_PERIODS_SHEET);
+  const assetsSheet = ss.getSheetByName(ASSETS_SHEET);
+  if (!periodsSheet) throw new Error('Не найден лист «' + HOLDING_PERIODS_SHEET + '»');
+  if (!assetsSheet) throw new Error('Не найден лист «' + ASSETS_SHEET + '»');
+
+  const periodValues = periodsSheet.getDataRange().getValues();
+  const assetValues = assetsSheet.getDataRange().getValues();
+  if (periodValues.length < 2) return [];
+
+  const periodHeaders = periodValues.shift().map(String);
+  const periodCol = {};
+  periodHeaders.forEach((name, index) => periodCol[name] = index);
+  const required = [
+    'holding_period_id','asset_id','Владелец','Счет','Дата входа','Дата выхода',
+    'Статус','Cost basis, RUB','Продажи net, RUB','Realized P&L, RUB','Realized return'
+  ];
+  required.forEach(name => {
+    if (periodCol[name] === undefined) {
+      throw new Error('В листе «' + HOLDING_PERIODS_SHEET + '» нет столбца «' + name + '»');
+    }
+  });
+
+  const assetMap = {};
+  if (assetValues.length) {
+    const assetHeaders = assetValues.shift().map(String);
+    const assetCol = {};
+    assetHeaders.forEach((name, index) => assetCol[name] = index);
+    if (assetCol.asset_id !== undefined) {
+      assetValues.forEach(row => {
+        const assetId = String(row[assetCol.asset_id] || '');
+        if (!assetId) return;
+        assetMap[assetId] = {
+          ticker: assetCol.ticker === undefined ? '' : String(row[assetCol.ticker] || ''),
+          name: assetCol['Название'] === undefined ? assetId : String(row[assetCol['Название']] || assetId),
+          assetType: assetCol['Тип актива'] === undefined ? '' : String(row[assetCol['Тип актива']] || '')
+        };
+      });
+    }
+  }
+
+  const n = value => Number(value) || 0;
+  const optionalNumber = (row, name) =>
+    periodCol[name] === undefined || row[periodCol[name]] === '' ? null : Number(row[periodCol[name]]) || 0;
+  const timezone = ss.getSpreadsheetTimeZone();
+
+  return periodValues
+    .filter(row => {
+      const status = String(row[periodCol['Статус']] || '').toLowerCase();
+      const exitDate = normalizeDate_(row[periodCol['Дата выхода']], timezone);
+      return (status === 'closed' || status === 'закрыт') &&
+        exitDate && Number(exitDate.slice(0, 4)) === Number(year);
+    })
+    .map(row => {
+      const assetId = String(row[periodCol.asset_id] || '');
+      const asset = assetMap[assetId] || { ticker: assetId, name: assetId, assetType: '' };
+      const realizedWithIncome = optionalNumber(row, 'Realized incl income RUB');
+      const pnl = realizedWithIncome === null ? n(row[periodCol['Realized P&L, RUB']]) : realizedWithIncome;
+      const income = optionalNumber(row, 'Cash income RUB');
+      const payouts = income === null ? (optionalNumber(row, 'Выплаты net, RUB') || 0) : income;
+      return {
+        holdingPeriodId: String(row[periodCol.holding_period_id] || ''),
+        assetId: assetId,
+        ticker: asset.ticker,
+        name: asset.name,
+        assetType: asset.assetType,
+        owner: String(row[periodCol['Владелец']] || ''),
+        account: String(row[periodCol['Счет']] || ''),
+        entryDate: normalizeDate_(row[periodCol['Дата входа']], timezone),
+        exitDate: normalizeDate_(row[periodCol['Дата выхода']], timezone),
+        costBasis: n(row[periodCol['Cost basis, RUB']]),
+        saleNet: n(row[periodCol['Продажи net, RUB']]),
+        income: payouts,
+        pnl: pnl,
+        ret: optionalNumber(row, 'Realized return')
+      };
+    })
+    .sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl) || b.exitDate.localeCompare(a.exitDate));
+}
+
+function normalizeDate_(value, timezone) {
+  if (value instanceof Date && !isNaN(value)) {
+    return Utilities.formatDate(value, timezone, 'yyyy-MM-dd');
+  }
+  const text = String(value || '').trim();
+  let match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return match[1] + '-' + match[2] + '-' + match[3];
+  match = text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (match) {
+    return match[3] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[1]).slice(-2);
+  }
+  return '';
 }
 
 function sum_(rows, field) {
@@ -265,3 +366,4 @@ function constantTimeEqual_(a, b) {
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
+
