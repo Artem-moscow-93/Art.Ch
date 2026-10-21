@@ -214,7 +214,11 @@ function buildDashboardData_() {
   }
 
   const closedYear = Number(Utilities.formatDate(asOf, ss.getSpreadsheetTimeZone(), 'yyyy'));
-  const closedTrades = buildClosedTrades_(ss, closedYear);
+  const closedTrades = buildClosedTrades_(ss);
+  const closedYears = Array.from(new Set(
+    closedTrades.map(row => Number(String(row.exitDate || '').slice(0, 4))).filter(Boolean)
+  )).sort((a, b) => b - a);
+  if (closedYears.indexOf(closedYear) === -1) closedYears.unshift(closedYear);
 
   return {
     asOf: Utilities.formatDate(asOf, ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd'),
@@ -225,6 +229,7 @@ function buildDashboardData_() {
     typeTotals: typeTotals,
     positions: positions,
     closedYear: closedYear,
+    closedYears: closedYears,
     closedTrades: closedTrades
   };
 }
@@ -280,7 +285,7 @@ function buildClosedTrades_(ss, year) {
       const status = String(row[periodCol['Статус']] || '').toLowerCase();
       const exitDate = normalizeDate_(row[periodCol['Дата выхода']], timezone);
       return (status === 'closed' || status === 'закрыт') &&
-        exitDate && Number(exitDate.slice(0, 4)) === Number(year);
+        exitDate && (!year || Number(exitDate.slice(0, 4)) === Number(year));
     })
     .map(row => {
       const assetId = String(row[periodCol.asset_id] || '');
