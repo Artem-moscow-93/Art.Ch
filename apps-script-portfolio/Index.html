@@ -51,6 +51,7 @@ select{padding:9px 10px;border:1px solid var(--line);border-radius:10px;backgrou
 .table-card{padding:18px}
 .table-wrap{overflow:auto;max-height:650px;border:1px solid var(--line);border-radius:12px}
 .closed-table-wrap{max-height:520px}
+.closed-total td{position:sticky;top:32px;z-index:1;background:#eef3ff;font-weight:760;border-bottom:1px solid #dce5ff}
 .rank{color:var(--muted);font-weight:700}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{position:sticky;top:0;background:#f8fafc;z-index:1;color:#657186;text-align:left;font-size:11px;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -159,7 +160,10 @@ tr:hover td{background:#fbfcff}
   <div class="toolbar">
     <div>
       <h2 style="margin:0 0 3px;font-size:15px">Закрытые сделки — <span id="closedYear"></span></h2>
-      <div class="sub">Периоды владения, закрытые за календарный год. Ранжирование — по модулю P&amp;L, знак результата сохранён.</div>
+      <div class="sub">Периоды владения, закрытые за выбранный год. Ранжирование — по модулю P&amp;L, знак результата сохранён.</div>
+    </div>
+    <div class="filters">
+      <select id="closedYearFilter" aria-label="Год закрытия сделки"></select>
     </div>
   </div>
   <div class="table-wrap closed-table-wrap">
@@ -207,21 +211,56 @@ document.getElementById('allocationLegend').innerHTML=alloc.map(([k,v])=>`<span>
 const expandedAssets=new Set();
 const escapeHtml = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-document.getElementById('closedYear').textContent=DATA.closedYear;
-const closedTrades=Array.isArray(DATA.closedTrades)?DATA.closedTrades:[];
-document.getElementById('closedTbody').innerHTML=closedTrades.map((x,index)=>`
-  <tr>
-    <td class="num rank">${index+1}</td>
-    <td>${dateLabel(x.exitDate)}</td>
-    <td><b>${escapeHtml(x.ticker)}</b></td>
-    <td class="name">${escapeHtml(x.name)}<div class="position-help">${escapeHtml(x.assetType)}</div></td>
-    <td>${escapeHtml(x.owner)} · ${escapeHtml(x.account)}</td>
-    <td class="num">${rub(x.costBasis)}</td>
-    <td class="num">${rub(x.saleNet)}</td>
-    <td class="num">${rub(x.income)}</td>
-    <td class="num ${cls(x.pnl)}"><b>${rub(x.pnl)}</b></td>
-    <td class="num ${cls(x.ret)}"><b>${x.ret===null?'—':pct(x.ret)}</b></td>
-  </tr>`).join('') || '<tr><td colspan="10" class="muted">В этом году закрытых сделок нет</td></tr>';
+const allClosedTrades=Array.isArray(DATA.closedTrades)?DATA.closedTrades:[];
+const closedYearFilter=document.getElementById('closedYearFilter');
+const availableYears=(Array.isArray(DATA.closedYears)?DATA.closedYears:[])
+  .map(Number).filter(Boolean).sort((a,b)=>b-a);
+const defaultClosedYear=Number(DATA.closedYear)||(availableYears[0]||new Date().getFullYear());
+if(!availableYears.includes(defaultClosedYear))availableYears.unshift(defaultClosedYear);
+closedYearFilter.innerHTML=availableYears.map(year=>`<option value="${year}">${year}</option>`).join('');
+closedYearFilter.value=String(defaultClosedYear);
+
+function renderClosedTrades(){
+  const selectedYear=Number(closedYearFilter.value)||defaultClosedYear;
+  const closedTrades=allClosedTrades.filter(x=>Number(String(x.exitDate||'').slice(0,4))===selectedYear);
+  document.getElementById('closedYear').textContent=selectedYear;
+  if(!closedTrades.length){
+    document.getElementById('closedTbody').innerHTML='<tr><td colspan="10" class="muted">В выбранном году закрытых сделок нет</td></tr>';
+    return;
+  }
+  const totals=closedTrades.reduce((acc,x)=>{
+    acc.costBasis+=Number(x.costBasis)||0;
+    acc.saleNet+=Number(x.saleNet)||0;
+    acc.income+=Number(x.income)||0;
+    acc.pnl+=Number(x.pnl)||0;
+    return acc;
+  },{costBasis:0,saleNet:0,income:0,pnl:0});
+  const totalRet=totals.costBasis?totals.pnl/totals.costBasis:null;
+  const totalRow=`<tr class="closed-total">
+    <td colspan="5">Итого за ${selectedYear} · ${closedTrades.length} сделок</td>
+    <td class="num">${rub(totals.costBasis)}</td>
+    <td class="num">${rub(totals.saleNet)}</td>
+    <td class="num">${rub(totals.income)}</td>
+    <td class="num ${cls(totals.pnl)}">${rub(totals.pnl)}</td>
+    <td class="num ${cls(totalRet)}">${totalRet===null?'—':pct(totalRet)}</td>
+  </tr>`;
+  const detailRows=closedTrades.map((x,index)=>`
+    <tr>
+      <td class="num rank">${index+1}</td>
+      <td>${dateLabel(x.exitDate)}</td>
+      <td><b>${escapeHtml(x.ticker)}</b></td>
+      <td class="name">${escapeHtml(x.name)}<div class="position-help">${escapeHtml(x.assetType)}</div></td>
+      <td>${escapeHtml(x.owner)} · ${escapeHtml(x.account)}</td>
+      <td class="num">${rub(x.costBasis)}</td>
+      <td class="num">${rub(x.saleNet)}</td>
+      <td class="num">${rub(x.income)}</td>
+      <td class="num ${cls(x.pnl)}"><b>${rub(x.pnl)}</b></td>
+      <td class="num ${cls(x.ret)}"><b>${x.ret===null?'—':pct(x.ret)}</b></td>
+    </tr>`).join('');
+  document.getElementById('closedTbody').innerHTML=totalRow+detailRows;
+}
+closedYearFilter.addEventListener('change',renderClosedTrades);
+renderClosedTrades();
 
 function groupPositions(positions){
   const groups=new Map();
